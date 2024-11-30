@@ -8,10 +8,21 @@ app.set('veiw engine' , 'ejs');
 const server = http.createServer(app);
 const PORT = 4000;
 const io = socketIO(server , {cors : {origin : '*'}});
-io.on('connection' , socket => {
-    const redisMulti = redisClient.multi()
-    socket.on('message' , ({username , message}) => {
-        redisMulti.rPush('messages' , `${username}:${message}`)
+async function sendMessages(socket){
+    redisClient.lrange('messages', 0 , -1 , (err , data) => {
+        data.map(item => {
+            const [username , message] = item.split(':');
+            socket.emit('message' , {
+                username , message
+            })
+        })
+        
+    })
+}
+io.on('connection' , async socket => {
+    sendMessages(socket)
+    socket.on('message' , async({username , message}) => {
+        redisClient.rpush('messages' , `${username}:${message}`)
         io.emit('message' , {username , message})
     })
 })
